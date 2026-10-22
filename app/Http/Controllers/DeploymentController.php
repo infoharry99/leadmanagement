@@ -75,6 +75,12 @@ class DeploymentController extends Controller
                     $message = 'Application cache, routes, and views cleared successfully!';
                     break;
 
+                case 'process-queue':
+                    Artisan::call('queue:work', ['--stop-when-empty' => true]);
+                    $output = Artisan::output() ?: 'Queue worker finished processing pending jobs.';
+                    $message = 'Pending queue jobs and campaign emails processed successfully!';
+                    break;
+
                 case 'optimize':
                     Artisan::call('config:cache');
                     $output .= Artisan::output();

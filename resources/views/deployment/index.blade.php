@@ -92,6 +92,12 @@
                         <i class="bi bi-chevron-right"></i>
                     </a>
                 </div>
+                <div class="col-md-6">
+                    <a href="{{ url('/deploy?action=process-queue&token=' . $token) }}" class="btn btn-success w-100 py-2.5 text-start d-flex align-items-center justify-content-between">
+                        <span><i class="bi bi-send-check-fill me-2"></i><strong>Process Queue (Send Pending Emails)</strong></span>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </div>
                 <div class="col-md-12">
                     <a href="{{ url('/deploy?action=optimize-clear&token=' . $token) }}" class="btn btn-outline-light w-100 py-2 text-start d-flex align-items-center justify-content-between">
                         <span><i class="bi bi-brush me-2"></i>Clear App & View Cache (optimize:clear)</span>
