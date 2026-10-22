@@ -125,4 +125,37 @@ class EmailCampaignAndSuppressionTest extends TestCase
             'lead_id' => $lead->id,
         ]);
     }
+
+    public function test_scheduled_campaigns_dispatched_via_artisan_command(): void
+    {
+        $lead = $this->leadService->createLead(['name' => 'Scheduled Lead', 'email' => 'sched@testdomain.com']);
+        $template = EmailTemplate::create([
+            'name' => 'Sched Tmpl',
+            'subject' => 'Scheduled Subject',
+            'body_html' => '<p>Hi</p>',
+            'category' => 'follow_up',
+        ]);
+        $campaign = EmailCampaign::create([
+            'name' => 'Scheduled Outreach',
+            'email_template_id' => $template->id,
+            'subject' => $template->subject,
+            'status' => 'scheduled',
+            'scheduled_at' => now()->subMinute(),
+            'created_by_id' => $this->admin->id,
+        ]);
+        $recipient = CampaignRecipient::create([
+            'email_campaign_id' => $campaign->id,
+            'lead_id' => $lead->id,
+            'email' => $lead->email,
+            'status' => 'pending',
+            'idempotency_key' => 'sched_test_key_1',
+        ]);
+
+        $this->artisan('nexteck:dispatch-scheduled-campaigns')->assertSuccessful();
+
+        $this->assertDatabaseHas('email_campaigns', [
+            'id' => $campaign->id,
+            'status' => 'running',
+        ]);
+    }
 }
