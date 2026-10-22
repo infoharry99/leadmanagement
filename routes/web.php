@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\ContentCalendarController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\EmailCampaignController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FollowupSequenceController;
@@ -43,6 +44,9 @@ Route::get('/blog', [PublicBlogController::class, 'index'])->name('public.blog.i
 Route::get('/blog/{slug}', [PublicBlogController::class, 'show'])->name('public.blog.show');
 Route::get('/sitemap.xml', [PublicBlogController::class, 'sitemap'])->name('public.sitemap');
 Route::get('/llms.txt', [PublicBlogController::class, 'llmsTxt'])->name('public.llms_txt');
+
+// Shared Hosting Deployment & Database Migration Runner
+Route::get('/deploy', [DeploymentController::class, 'handle'])->name('deploy.handle');
 
 /*
 |--------------------------------------------------------------------------
