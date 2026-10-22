@@ -21,11 +21,21 @@
         @if($campaign->status === 'draft' || $campaign->status === 'scheduled')
             <form action="{{ route('campaigns.dispatch', $campaign) }}" method="POST">
                 @csrf
-                <button type="submit" class="btn btn-success btn-sm shadow-sm d-flex align-items-center gap-1 fw-bold px-3">
-                    <i class="bi bi-send-fill"></i> Dispatch Campaign to Queues
+                <button type="submit" class="btn btn-primary btn-sm shadow-sm d-flex align-items-center gap-1 fw-bold px-3">
+                    <i class="bi bi-send-fill"></i> Dispatch Campaign
                 </button>
             </form>
         @endif
+
+        @if($campaign->recipients()->whereIn('status', ['pending', 'queued'])->exists())
+            <form action="{{ route('campaigns.send-now', $campaign) }}" method="POST">
+                @csrf
+                <button type="submit" class="btn btn-success btn-sm shadow-sm d-flex align-items-center gap-1 fw-bold px-3">
+                    <i class="bi bi-lightning-charge-fill"></i> Send Queued Now (Instant Send)
+                </button>
+            </form>
+        @endif
+
         @if($campaign->status === 'running')
             <form action="{{ route('campaigns.pause', $campaign) }}" method="POST">
                 @csrf

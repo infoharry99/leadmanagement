@@ -129,7 +129,7 @@ class EmailCampaignController extends Controller
 
         $campaign->update(['status' => 'running']);
 
-        $pendingRecipients = $campaign->recipients()->where('status', 'pending')->get();
+        $pendingRecipients = $campaign->recipients()->whereIn('status', ['pending', 'queued'])->get();
 
         foreach ($pendingRecipients as $recipient) {
             $recipient->update(['status' => 'queued']);
@@ -137,6 +137,25 @@ class EmailCampaignController extends Controller
         }
 
         return back()->with('success', "Dispatched {$pendingRecipients->count()} campaign emails to background queue workers.");
+    }
+
+    /**
+     * Send queued/pending emails directly via SMTP (Bypasses queue for instant delivery)
+     */
+    public function sendNow(EmailCampaign $campaign)
+    {
+        $campaign->update(['status' => 'running']);
+
+        $recipients = $campaign->recipients()->whereIn('status', ['pending', 'queued', 'failed'])->get();
+        $sentCount = 0;
+
+        foreach ($recipients as $recipient) {
+            if ($this->emailService->sendCampaignEmail($recipient)) {
+                $sentCount++;
+            }
+        }
+
+        return back()->with('success', "Processed and sent {$sentCount} campaign emails directly via SMTP.");
     }
 
     public function pause(EmailCampaign $campaign)

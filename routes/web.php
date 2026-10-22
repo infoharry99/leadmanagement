@@ -76,6 +76,7 @@ Route::middleware(['auth'])->group(function () {
     // Email Marketing & Campaigns
     Route::prefix('campaigns')->name('campaigns.')->group(function () {
         Route::post('/{campaign}/dispatch', [EmailCampaignController::class, 'dispatchCampaign'])->name('dispatch');
+        Route::post('/{campaign}/send-now', [EmailCampaignController::class, 'sendNow'])->name('send-now');
         Route::post('/{campaign}/pause', [EmailCampaignController::class, 'pause'])->name('pause');
         Route::post('/{campaign}/cancel', [EmailCampaignController::class, 'cancel'])->name('cancel');
     });
