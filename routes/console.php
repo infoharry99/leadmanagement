@@ -18,3 +18,8 @@ Schedule::command('nexteck:process-followups')
 Schedule::command('nexteck:publish-social')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+// Nexteck Background Queue Worker (Processes queued campaign emails every minute)
+Schedule::command('queue:work --stop-when-empty --max-time=50')
+    ->everyMinute()
+    ->withoutOverlapping();
