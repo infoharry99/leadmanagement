@@ -99,4 +99,23 @@ class LeadManagementTest extends TestCase
             'description' => 'Discussed paper beets inventory',
         ]);
     }
+
+    public function test_lead_show_page_renders_with_notes_and_activities(): void
+    {
+        $lead = $this->leadService->createLead([
+            'name' => 'Jim Halpert',
+            'email' => 'jim@dundermifflin.com',
+            'notes' => 'General lead requirement note string',
+        ]);
+
+        $lead->leadNotes()->create([
+            'user_id' => $this->admin->id,
+            'note' => 'First private note regarding contract',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('leads.show', $lead));
+        $response->assertStatus(200);
+        $response->assertSee('Private Notes (1)', false);
+        $response->assertSee('First private note regarding contract');
+    }
 }

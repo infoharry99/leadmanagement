@@ -163,7 +163,7 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link py-3 fw-semibold small" id="notes-tab" data-bs-toggle="tab" data-bs-target="#notes" type="button">
-                            <i class="bi bi-sticky me-1"></i> Private Notes ({{ $lead->notes->count() }})
+                            <i class="bi bi-sticky me-1"></i> Private Notes ({{ $lead->leadNotes->count() }})
                         </button>
                     </li>
                     <li class="nav-item">
@@ -223,7 +223,7 @@
                         </form>
 
                         <div class="d-flex flex-column gap-3">
-                            @forelse($lead->notes as $note)
+                            @forelse($lead->leadNotes as $note)
                                 <div class="p-3 bg-light rounded-3 border">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <span class="fw-semibold small text-primary">{{ $note->user?->name ?? 'User' }}</span>

@@ -82,7 +82,7 @@ class LeadController extends Controller
             'source',
             'tags',
             'activities.user',
-            'notes.user',
+            'leadNotes.user',
             'tasks.assignedUser',
             'campaignRecipients.campaign',
             'sequenceEnrollments.sequence',
