@@ -16,6 +16,12 @@ class DeploymentController extends Controller
      */
     public function handle(Request $request)
     {
+        // Force file/array drivers for deployment requests to prevent touching non-existent tables
+        config([
+            'session.driver' => 'file',
+            'cache.default' => 'file',
+        ]);
+
         // Security token check (can be set in .env as DEPLOY_TOKEN)
         $expectedToken = env('DEPLOY_TOKEN', 'nexteck2026deploy');
         $providedToken = $request->query('token');

@@ -45,8 +45,10 @@ Route::get('/blog/{slug}', [PublicBlogController::class, 'show'])->name('public.
 Route::get('/sitemap.xml', [PublicBlogController::class, 'sitemap'])->name('public.sitemap');
 Route::get('/llms.txt', [PublicBlogController::class, 'llmsTxt'])->name('public.llms_txt');
 
-// Shared Hosting Deployment & Database Migration Runner
-Route::get('/deploy', [DeploymentController::class, 'handle'])->name('deploy.handle');
+// Shared Hosting Deployment & Database Migration Runner (bypasses session/database middleware)
+Route::get('/deploy', [DeploymentController::class, 'handle'])
+    ->withoutMiddleware('web')
+    ->name('deploy.handle');
 
 /*
 |--------------------------------------------------------------------------
