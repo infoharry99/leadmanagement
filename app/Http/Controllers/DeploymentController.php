@@ -81,6 +81,43 @@ class DeploymentController extends Controller
                     $message = 'Pending queue jobs and campaign emails processed successfully!';
                     break;
 
+                case 'test-email':
+                    $mailer = config('mail.default');
+                    $to = $request->query('to', 'infoharry99@gmail.com');
+                    $fromAddress = config('mail.from.address');
+                    $fromName = config('mail.from.name', 'Nexteck Test');
+                    $smtpHost = config('mail.mailers.smtp.host');
+                    $smtpPort = config('mail.mailers.smtp.port');
+
+                    if ($mailer === 'log') {
+                        $status = 'error';
+                        $message = "CRITICAL: MAIL_MAILER is currently set to 'log' in active config! Emails are written to storage/logs/laravel.log and NOT sent over the internet.";
+                        $output = "Current Mailer: log\n"
+                            . "To fix this:\n"
+                            . "1. Edit .env and change: MAIL_MAILER=smtp\n"
+                            . "2. Click 'Clear App & View Cache (optimize:clear)' button on this page.\n"
+                            . "3. Re-test email delivery.";
+                        break;
+                    }
+
+                    \Illuminate\Support\Facades\Mail::raw(
+                        "Hello Hariom,\n\nThis is a LIVE SMTP delivery confirmation from Nexteck Lead Engine!\nSent at: " . now()->toDateTimeString() . "\n\nServer Mailer: {$mailer}\nSMTP Host: {$smtpHost}:{$smtpPort}\nFrom: {$fromAddress}\nTo: {$to}\n\nIf you see this, your SMTP delivery is working perfectly!",
+                        function ($msg) use ($to, $fromAddress, $fromName) {
+                            $msg->to($to)
+                                ->from($fromAddress, $fromName)
+                                ->subject('Nexteck CRM - Live SMTP Delivery Test (' . now()->format('H:i:s') . ')');
+                        }
+                    );
+
+                    $message = "Test email sent to {$to} via {$mailer} ({$smtpHost}:{$smtpPort})!";
+                    $output = "SUCCESS!\n"
+                        . "Mailer: {$mailer}\n"
+                        . "Host: {$smtpHost}:{$smtpPort}\n"
+                        . "From: {$fromAddress}\n"
+                        . "To: {$to}\n\n"
+                        . "Check your Gmail inbox and Spam folder now.";
+                    break;
+
                 case 'optimize':
                     Artisan::call('config:cache');
                     $output .= Artisan::output();
@@ -121,6 +158,9 @@ class DeploymentController extends Controller
             'dbConnected' => $dbConnected,
             'tablesCount' => count($tables),
             'databaseName' => config('database.connections.mysql.database'),
+            'activeMailer' => config('mail.default'),
+            'fromAddress' => config('mail.from.address'),
+            'smtpHost' => config('mail.mailers.smtp.host'),
         ]);
     }
 }

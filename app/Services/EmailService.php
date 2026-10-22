@@ -69,7 +69,10 @@ class EmailService
 
         // 5. Send Email via Mailer (log / smtp / queue)
         try {
-            $fromEmail = $campaign->from_email ?: config('mail.from.address');
+            $defaultSender = config('mail.from.address');
+            $fromEmail = ($campaign->from_email && $campaign->from_email !== 'outreach@nexteck.com') 
+                ? $campaign->from_email 
+                : ($defaultSender ?: 'outreach@nexteck.com');
             $fromName = $campaign->from_name ?: config('mail.from.name');
 
             Mail::html($rendered['body_html'], function ($message) use ($recipient, $rendered, $fromEmail, $fromName, $campaign, $unsubscribeUrl) {

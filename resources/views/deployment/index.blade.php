@@ -47,10 +47,15 @@
                 <h4 class="fw-bold mb-1 text-white"><i class="bi bi-database-fill-gear text-primary me-2"></i>Database Deployment Runner</h4>
                 <p class="text-secondary small mb-0">Shared Hosting Helper for Migrations, Seeders & Cache</p>
             </div>
-            <span class="badge {{ $dbConnected ? 'bg-success' : 'bg-danger' }} px-3 py-2">
-                <i class="bi {{ $dbConnected ? 'bi-check-circle' : 'bi-x-circle' }} me-1"></i>
-                DB: {{ $dbConnected ? 'Connected (' . $tablesCount . ' tables)' : 'Connection Failed' }}
-            </span>
+            <div class="d-flex flex-column align-items-end gap-1">
+                <span class="badge {{ $dbConnected ? 'bg-success' : 'bg-danger' }} px-3 py-1.5">
+                    <i class="bi {{ $dbConnected ? 'bi-check-circle' : 'bi-x-circle' }} me-1"></i>
+                    DB: {{ $dbConnected ? 'Connected (' . $tablesCount . ' tables)' : 'Connection Failed' }}
+                </span>
+                <span class="badge {{ $activeMailer === 'smtp' ? 'bg-info text-dark' : 'bg-warning text-dark' }} px-3 py-1">
+                    <i class="bi bi-envelope me-1"></i> Mailer: <strong>{{ strtoupper($activeMailer) }}</strong>
+                </span>
+            </div>
         </div>
 
         @if($status === 'success' && !empty($message))
@@ -95,6 +100,12 @@
                 <div class="col-md-6">
                     <a href="{{ url('/deploy?action=process-queue&token=' . $token) }}" class="btn btn-success w-100 py-2.5 text-start d-flex align-items-center justify-content-between">
                         <span><i class="bi bi-send-check-fill me-2"></i><strong>Process Queue (Send Pending Emails)</strong></span>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{{ url('/deploy?action=test-email&to=infoharry99@gmail.com&token=' . $token) }}" class="btn btn-warning w-100 py-2.5 text-start d-flex align-items-center justify-content-between text-dark fw-bold">
+                        <span><i class="bi bi-envelope-at-fill me-2"></i>Send Test Email via SMTP</span>
                         <i class="bi bi-chevron-right"></i>
                     </a>
                 </div>
