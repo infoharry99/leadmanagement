@@ -4,34 +4,77 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\SocialAccount;
-use App\Models\SocialComment;
 use App\Models\SocialPost;
 use App\Models\SocialPostAccount;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class SocialMediaService
 {
     /**
-     * Publish a post to its designated social accounts
+     * Validate platform media and content requirements before publishing
+     */
+    public function validatePlatformRestrictions(array $platforms, ?string $content, ?array $mediaUrls): array
+    {
+        $errors = [];
+
+        foreach ($platforms as $platform) {
+            $hasMedia = !empty($mediaUrls) && count($mediaUrls) > 0;
+            $firstMedia = $hasMedia ? $mediaUrls[0] : null;
+            $isVideo = $firstMedia && preg_match('/\.(mp4|mov|webm)$/i', $firstMedia);
+            $isImage = $firstMedia && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $firstMedia);
+
+            switch ($platform) {
+                case 'instagram':
+                    if (!$hasMedia) {
+                        $errors['instagram'] = 'Instagram requires an image or video file. Text-only posts are not supported by the Instagram Graph API.';
+                    }
+                    break;
+
+                case 'tiktok':
+                    if (!$hasMedia || !$isVideo) {
+                        $errors['tiktok'] = 'TikTok requires a video file (.mp4, .mov, or .webm). Images and text-only posts are not eligible for publishing.';
+                    }
+                    break;
+
+                case 'facebook':
+                case 'linkedin':
+                    if (empty(trim($content ?? '')) && !$hasMedia) {
+                        $errors[$platform] = ucfirst($platform) . ' post must contain either text content or an image/video.';
+                    }
+                    break;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Publish a post to all designated target social accounts
      */
     public function publishPost(SocialPost $post): array
     {
-        $results = ['success' => 0, 'failed' => 0, 'details' => []];
-
+        $results = ['success' => 0, 'failed' => 0, 'errors' => []];
         $targetPlatforms = $post->target_platforms ?? [];
-        $accounts = SocialAccount::whereIn('platform', $targetPlatforms)->where('is_active', true)->get();
+
+        // Check if there are active connected accounts for the requested platforms
+        $accounts = SocialAccount::whereIn('platform', $targetPlatforms)
+            ->where('is_active', true)
+            ->get();
 
         if ($accounts->isEmpty()) {
+            $errorMessage = 'No active connected accounts found for: ' . implode(', ', array_map('ucfirst', $targetPlatforms)) . '. Please connect your accounts in Settings → Social Connections.';
             $post->update([
                 'status' => 'failed',
-                'error_message' => 'No active connected social accounts found for selected platforms.',
+                'error_message' => $errorMessage,
             ]);
-            return ['success' => 0, 'failed' => 1, 'details' => ['No active accounts found']];
+            return ['success' => 0, 'failed' => count($targetPlatforms), 'errors' => [$errorMessage]];
         }
 
-        $allPublished = true;
+        // Validate platform media restrictions
+        $restrictionErrors = $this->validatePlatformRestrictions($targetPlatforms, $post->content, $post->media_urls);
+        $allSuccessful = true;
 
         foreach ($accounts as $account) {
             $postAccount = SocialPostAccount::firstOrCreate(
@@ -39,166 +82,321 @@ class SocialMediaService
                 ['status' => 'pending']
             );
 
-            // Check token expiration
-            if ($account->isTokenExpired()) {
+            // Platform-specific rule check
+            if (isset($restrictionErrors[$account->platform])) {
                 $postAccount->update([
                     'status' => 'failed',
-                    'error_message' => 'OAuth token expired. Please reconnect this account.',
+                    'error_message' => $restrictionErrors[$account->platform],
                 ]);
                 $results['failed']++;
-                $allPublished = false;
+                $results['errors'][] = "({$account->account_name}) " . $restrictionErrors[$account->platform];
+                $allSuccessful = false;
+                continue;
+            }
+
+            // Check token expiration
+            if ($account->isTokenExpired()) {
+                $error = "OAuth token for {$account->account_name} has expired. Please reconnect in Settings → Social Connections.";
+                $postAccount->update([
+                    'status' => 'failed',
+                    'error_message' => $error,
+                ]);
+                $results['failed']++;
+                $results['errors'][] = $error;
+                $allSuccessful = false;
                 continue;
             }
 
             try {
-                $publishResponse = $this->dispatchToPlatform($account, $post);
-                if ($publishResponse['success']) {
+                $response = $this->dispatchToPlatform($account, $post);
+
+                if ($response['success']) {
                     $postAccount->update([
                         'status' => 'published',
-                        'platform_post_id' => $publishResponse['platform_post_id'],
+                        'platform_post_id' => $response['platform_post_id'] ?? null,
                         'published_at' => now(),
-                        'engagement_metrics' => ['likes' => 0, 'comments' => 0, 'shares' => 0, 'impressions' => 0],
+                        'error_message' => null,
+                        'engagement_metrics' => ['likes' => 0, 'comments' => 0, 'shares' => 0],
                     ]);
                     $results['success']++;
                 } else {
                     $postAccount->update([
                         'status' => 'failed',
-                        'error_message' => $publishResponse['error'],
+                        'error_message' => $response['error'] ?? 'Publishing failed.',
                     ]);
                     $results['failed']++;
-                    $allPublished = false;
+                    $results['errors'][] = "({$account->platform}) " . ($response['error'] ?? 'Unknown error');
+                    $allSuccessful = false;
                 }
-            } catch (\Exception $e) {
-                Log::error("Social publishing error on {$account->platform}: " . $e->getMessage());
+            } catch (Throwable $e) {
+                Log::error("Social publishing exception on {$account->platform}: " . $e->getMessage());
                 $postAccount->update([
                     'status' => 'failed',
                     'error_message' => $e->getMessage(),
                 ]);
                 $results['failed']++;
-                $allPublished = false;
+                $results['errors'][] = "({$account->platform}) " . $e->getMessage();
+                $allSuccessful = false;
             }
         }
 
+        // Update overall post status
+        $finalStatus = $allSuccessful && $results['success'] > 0
+            ? 'published'
+            : ($results['success'] > 0 ? 'published' : 'failed');
+
         $post->update([
-            'status' => $allPublished ? 'published' : ($results['success'] > 0 ? 'published' : 'failed'),
+            'status' => $finalStatus,
             'published_at' => $results['success'] > 0 ? now() : null,
-            'error_message' => $allPublished ? null : 'Some platforms failed to publish.',
+            'error_message' => !empty($results['errors']) ? implode(' | ', $results['errors']) : null,
         ]);
 
-        AuditLog::log('social_post_published', SocialPost::class, $post->id, null, $results);
+        if (class_exists(AuditLog::class)) {
+            AuditLog::log('social_post_published', SocialPost::class, $post->id, null, $results);
+        }
 
         return $results;
     }
 
     /**
-     * Dispatch post to specific platform adapter
+     * Dispatch to official platform adapter
      */
     protected function dispatchToPlatform(SocialAccount $account, SocialPost $post): array
     {
         return match ($account->platform) {
-            'linkedin' => $this->publishToLinkedIn($account, $post),
             'facebook' => $this->publishToFacebook($account, $post),
             'instagram' => $this->publishToInstagram($account, $post),
+            'linkedin' => $this->publishToLinkedIn($account, $post),
             'tiktok' => $this->publishToTikTok($account, $post),
             default => ['success' => false, 'error' => "Unsupported platform: {$account->platform}"],
         };
     }
 
-    protected function publishToLinkedIn(SocialAccount $account, SocialPost $post): array
+    /**
+     * Facebook Pages Graph API
+     */
+    protected function publishToFacebook(SocialAccount $account, SocialPost $post): array
     {
-        // If live production token and client configured:
         $token = $account->access_token;
-        if (!empty($token) && !str_starts_with($token, 'mock_')) {
-            $response = Http::withToken($token)
-                ->post('https://api.linkedin.com/v2/ugcPosts', [
-                    'author' => 'urn:li:person:' . $account->account_id,
-                    'lifecycleState' => 'PUBLISHED',
-                    'specificContent' => [
-                        'com.linkedin.ugc.ShareContent' => [
-                            'shareCommentary' => ['text' => $post->content],
-                            'shareMediaCategory' => 'NONE',
-                        ]
-                    ],
-                    'visibility' => ['com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC'],
-                ]);
+        $pageId = $account->account_id;
+        $mediaUrls = $post->media_urls ?? [];
+        $hasMedia = !empty($mediaUrls);
+        $fullText = $this->buildFullPostText($post);
 
-            if ($response->successful()) {
-                return ['success' => true, 'platform_post_id' => $response->json('id')];
+        // Real API Call if real token present
+        if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
+            $endpoint = "https://graph.facebook.com/v20.0/{$pageId}/";
+
+            if ($hasMedia) {
+                $firstMedia = $mediaUrls[0];
+                $isVideo = preg_match('/\.(mp4|mov|webm)$/i', $firstMedia);
+
+                if ($isVideo) {
+                    // Video Post
+                    $res = Http::post($endpoint . 'videos', [
+                        'file_url' => url($firstMedia),
+                        'description' => $fullText,
+                        'access_token' => $token,
+                    ]);
+                } else {
+                    // Photo Post
+                    $res = Http::post($endpoint . 'photos', [
+                        'url' => url($firstMedia),
+                        'caption' => $fullText,
+                        'access_token' => $token,
+                    ]);
+                }
+            } else {
+                // Text Status Post
+                $res = Http::post($endpoint . 'feed', [
+                    'message' => $fullText,
+                    'access_token' => $token,
+                ]);
             }
-            return ['success' => false, 'error' => $response->body()];
+
+            if ($res->successful()) {
+                return ['success' => true, 'platform_post_id' => $res->json('id') ?? $res->json('post_id')];
+            }
+
+            $errorMsg = $res->json('error.message') ?? $res->body();
+            return ['success' => false, 'error' => "Meta Graph API Error: {$errorMsg}"];
         }
 
-        // Production-ready API adapter simulator for local/staging verification
+        // Clean Sandbox confirmation for local/staging testing
+        return [
+            'success' => true,
+            'platform_post_id' => 'fb_post_' . rand(100000000000, 999999999999),
+        ];
+    }
+
+    /**
+     * Instagram Graph API (2-step container workflow)
+     */
+    protected function publishToInstagram(SocialAccount $account, SocialPost $post): array
+    {
+        $token = $account->access_token;
+        $igUserId = $account->account_id;
+        $mediaUrls = $post->media_urls ?? [];
+
+        if (empty($mediaUrls)) {
+            return ['success' => false, 'error' => 'Instagram requires an image or video file.'];
+        }
+
+        $fullText = $this->buildFullPostText($post);
+        $firstMedia = $mediaUrls[0];
+        $isVideo = preg_match('/\.(mp4|mov|webm)$/i', $firstMedia);
+
+        if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
+            $endpoint = "https://graph.facebook.com/v20.0/{$igUserId}/";
+
+            // Step 1: Create Media Container
+            $containerParams = [
+                'caption' => $fullText,
+                'access_token' => $token,
+            ];
+
+            if ($isVideo) {
+                $containerParams['media_type'] = 'REELS';
+                $containerParams['video_url'] = url($firstMedia);
+            } else {
+                $containerParams['image_url'] = url($firstMedia);
+            }
+
+            $containerRes = Http::post($endpoint . 'media', $containerParams);
+
+            if (!$containerRes->successful()) {
+                $errorMsg = $containerRes->json('error.message') ?? $containerRes->body();
+                return ['success' => false, 'error' => "Instagram Media Container Error: {$errorMsg}"];
+            }
+
+            $creationId = $containerRes->json('id');
+
+            // Step 2: Publish the Container
+            $publishRes = Http::post($endpoint . 'media_publish', [
+                'creation_id' => $creationId,
+                'access_token' => $token,
+            ]);
+
+            if ($publishRes->successful()) {
+                return ['success' => true, 'platform_post_id' => $publishRes->json('id')];
+            }
+
+            $errorMsg = $publishRes->json('error.message') ?? $publishRes->body();
+            return ['success' => false, 'error' => "Instagram Publish Error: {$errorMsg}"];
+        }
+
+        return [
+            'success' => true,
+            'platform_post_id' => 'ig_post_' . rand(100000000000, 999999999999),
+        ];
+    }
+
+    /**
+     * LinkedIn Share API
+     */
+    protected function publishToLinkedIn(SocialAccount $account, SocialPost $post): array
+    {
+        $token = $account->access_token;
+        $authorUrn = str_starts_with($account->account_id, 'urn:li:') 
+            ? $account->account_id 
+            : 'urn:li:person:' . $account->account_id;
+        $fullText = $this->buildFullPostText($post);
+
+        if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
+            $payload = [
+                'author' => $authorUrn,
+                'lifecycleState' => 'PUBLISHED',
+                'specificContent' => [
+                    'com.linkedin.ugc.ShareContent' => [
+                        'shareCommentary' => ['text' => $fullText],
+                        'shareMediaCategory' => 'NONE',
+                    ],
+                ],
+                'visibility' => ['com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC'],
+            ];
+
+            $res = Http::withToken($token)
+                ->withHeaders(['X-Restli-Protocol-Version' => '2.0.0'])
+                ->post('https://api.linkedin.com/v2/ugcPosts', $payload);
+
+            if ($res->successful()) {
+                return ['success' => true, 'platform_post_id' => $res->json('id')];
+            }
+
+            $errorMsg = $res->json('message') ?? $res->body();
+            return ['success' => false, 'error' => "LinkedIn API Error: {$errorMsg}"];
+        }
+
         return [
             'success' => true,
             'platform_post_id' => 'urn:li:share:' . rand(1000000000, 9999999999),
         ];
     }
 
-    protected function publishToFacebook(SocialAccount $account, SocialPost $post): array
+    /**
+     * TikTok Content Posting API
+     */
+    protected function publishToTikTok(SocialAccount $account, SocialPost $post): array
     {
         $token = $account->access_token;
-        if (!empty($token) && !str_starts_with($token, 'mock_')) {
-            $response = Http::post("https://graph.facebook.com/v19.0/{$account->account_id}/feed", [
-                'message' => $post->content,
-                'access_token' => $token,
-            ]);
+        $mediaUrls = $post->media_urls ?? [];
 
-            if ($response->successful()) {
-                return ['success' => true, 'platform_post_id' => $response->json('id')];
+        if (empty($mediaUrls)) {
+            return ['success' => false, 'error' => 'TikTok requires a video file (.mp4, .mov).'];
+        }
+
+        $firstMedia = $mediaUrls[0];
+        $fullText = $this->buildFullPostText($post);
+
+        if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
+            $payload = [
+                'post_info' => [
+                    'title' => mb_substr($fullText, 0, 150),
+                    'privacy_level' => 'PUBLIC_TO_EVERYONE',
+                    'disable_duet' => false,
+                    'disable_stitch' => false,
+                    'disable_comment' => false,
+                ],
+                'source_info' => [
+                    'source' => 'PULL_FROM_URL',
+                    'video_url' => url($firstMedia),
+                ],
+            ];
+
+            $res = Http::withToken($token)
+                ->post('https://open.tiktokapis.com/v2/post/publish/video/init/', $payload);
+
+            if ($res->successful() && $res->json('data.publish_id')) {
+                return ['success' => true, 'platform_post_id' => $res->json('data.publish_id')];
             }
-            return ['success' => false, 'error' => $response->body()];
+
+            $errorMsg = $res->json('error.message') ?? $res->body();
+            return ['success' => false, 'error' => "TikTok API Error: {$errorMsg}"];
         }
 
         return [
             'success' => true,
-            'platform_post_id' => 'fb_post_' . rand(10000000, 99999999),
-        ];
-    }
-
-    protected function publishToInstagram(SocialAccount $account, SocialPost $post): array
-    {
-        // Instagram Graph API requires container creation and publishing step
-        return [
-            'success' => true,
-            'platform_post_id' => 'ig_media_' . rand(10000000, 99999999),
-        ];
-    }
-
-    protected function publishToTikTok(SocialAccount $account, SocialPost $post): array
-    {
-        // TikTok Content Posting API v2
-        return [
-            'success' => true,
-            'platform_post_id' => 'tt_video_' . rand(10000000, 99999999),
+            'platform_post_id' => 'tt_publish_' . rand(10000000, 99999999),
         ];
     }
 
     /**
-     * Reply to a social comment where API supports it
+     * Append hashtags cleanly to content
      */
-    public function replyToComment(SocialComment $comment, string $replyText): bool
+    protected function buildFullPostText(SocialPost $post): string
     {
-        $account = $comment->account;
-        if (!$account || !$account->is_active) {
-            throw new \RuntimeException("Social account is inactive.");
+        $text = trim($post->content ?? '');
+        $hashtags = $post->hashtags ?? [];
+
+        if (!empty($hashtags)) {
+            $tagsString = implode(' ', array_map(function ($tag) {
+                $tag = trim($tag);
+                return str_starts_with($tag, '#') ? $tag : '#' . $tag;
+            }, $hashtags));
+
+            $text .= "\n\n" . $tagsString;
         }
 
-        $comment->update(['status' => 'responded']);
-
-        SocialComment::create([
-            'social_account_id' => $account->id,
-            'platform_post_id' => $comment->platform_post_id,
-            'comment_id' => 'reply_' . rand(100000, 999999),
-            'author_name' => 'Nexteck Team',
-            'author_id' => $account->account_id,
-            'content' => $replyText,
-            'sentiment' => 'neutral',
-            'status' => 'responded',
-            'parent_comment_id' => $comment->comment_id,
-            'commented_at' => now(),
-        ]);
-
-        return true;
+        return trim($text);
     }
 }

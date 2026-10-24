@@ -14,6 +14,9 @@ use App\Http\Controllers\LeadImportExportController;
 use App\Http\Controllers\ManagerHandoverController;
 use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\SocialConfigController;
+use App\Http\Controllers\SocialConnectionController;
+use App\Http\Controllers\SocialPostController;
 use App\Http\Controllers\SocialPublishingController;
 use App\Http\Controllers\TaskManagerController;
 use App\Http\Controllers\UnifiedInboxController;
@@ -26,7 +29,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 Route::get('/', function () {
-    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
+    return auth()->check() ? redirect()->route('social.posts.dashboard') : redirect()->route('login');
 });
 
 // Authentication
@@ -136,7 +139,36 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/save-to-social', [AiStudioController::class, 'saveToSocial'])->name('save-to-social');
     });
 
-    // Social Media Publishing & Engagement
+    // Simple Social Media Post Scheduler (Clean, Modern, Dedicated Dashboard)
+    Route::get('/social-scheduler', [SocialPostController::class, 'dashboard'])->name('social.posts.dashboard');
+
+    Route::prefix('social-scheduler/posts')->name('social.posts.')->group(function () {
+        Route::get('/', [SocialPostController::class, 'index'])->name('index');
+        Route::get('/create', [SocialPostController::class, 'create'])->name('create');
+        Route::post('/', [SocialPostController::class, 'store'])->name('store');
+        Route::get('/{post}', [SocialPostController::class, 'show'])->name('show');
+        Route::post('/{post}/retry', [SocialPostController::class, 'retry'])->name('retry');
+        Route::delete('/{post}', [SocialPostController::class, 'destroy'])->name('destroy');
+    });
+
+    // Settings → Social Media Connections (Instagram, Facebook, LinkedIn, TikTok)
+    Route::prefix('social-scheduler/connections')->name('social.connections.')->group(function () {
+        Route::get('/', [SocialConnectionController::class, 'index'])->name('index');
+        Route::post('/manual', [SocialConnectionController::class, 'connectManual'])->name('manual');
+        Route::post('/{account}/disconnect', [SocialConnectionController::class, 'disconnect'])->name('disconnect');
+    });
+
+    // Official OAuth Redirect & Callback
+    Route::get('/social/oauth/{platform}/redirect', [SocialConnectionController::class, 'oauthRedirect'])->name('social.oauth.redirect');
+    Route::get('/social/callback/{platform}', [SocialConnectionController::class, 'oauthCallback'])->name('social.oauth.callback');
+
+    // Settings → API Configuration & Developer Guides
+    Route::prefix('social-scheduler/config')->name('social.config.')->group(function () {
+        Route::get('/', [SocialConfigController::class, 'index'])->name('index');
+        Route::post('/', [SocialConfigController::class, 'update'])->name('update');
+    });
+
+    // Legacy Social Media Publishing & Engagement Compatibility
     Route::prefix('social')->name('social.')->group(function () {
         Route::get('/', [SocialPublishingController::class, 'index'])->name('index');
         Route::get('/create', [SocialPublishingController::class, 'create'])->name('create');
