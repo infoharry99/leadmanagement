@@ -249,6 +249,28 @@ class SocialPostSchedulerTest extends TestCase
         $this->assertFalse($account->is_active);
     }
 
+    public function test_meta_webhook_verification_handshake_succeeds(): void
+    {
+        // Unauthenticated Meta crawler verifies the webhook with challenge
+        $response = $this->get('/social/callback/instagram?hub.mode=subscribe&hub.challenge=1158201444&hub.verify_token=test');
+
+        $response->assertStatus(200);
+        $this->assertEquals('1158201444', $response->getContent());
+
+        // Dedicated webhook endpoint
+        $responseDedicated = $this->get('/webhooks/meta?hub.mode=subscribe&hub.challenge=99887766&hub.verify_token=test');
+        $responseDedicated->assertStatus(200);
+        $this->assertEquals('99887766', $responseDedicated->getContent());
+
+        // POST webhook event
+        $responsePost = $this->postJson('/social/callback/instagram', [
+            'object' => 'instagram',
+            'entry' => [],
+        ]);
+        $responsePost->assertStatus(200);
+        $responsePost->assertJson(['status' => 'EVENT_RECEIVED']);
+    }
+
     public function test_user_can_view_api_configuration_page(): void
     {
         $response = $this->actingAs($this->user)->get(route('social.config.index'));

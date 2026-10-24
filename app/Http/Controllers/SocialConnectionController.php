@@ -101,15 +101,33 @@ class SocialConnectionController extends Controller
     }
 
     /**
-     * Handle OAuth Callback from Platform
+     * Handle OAuth Callback from Platform & Meta Webhook Handshake
      */
     public function oauthCallback(string $platform, Request $request)
     {
+        // 1. Meta Webhook Verification Handshake (hub.mode, hub.challenge, hub.verify_token)
+        $hubMode = $request->input('hub_mode') ?? $request->query('hub.mode') ?? $request->query('hub_mode');
+        $hubChallenge = $request->input('hub_challenge') ?? $request->query('hub.challenge') ?? $request->query('hub_challenge');
+        $hubVerifyToken = $request->input('hub_verify_token') ?? $request->query('hub.verify_token') ?? $request->query('hub_verify_token');
+
+        if ($hubMode === 'subscribe' && !empty($hubChallenge)) {
+            Log::info("Meta Webhook verification handshake received for {$platform} with token: {$hubVerifyToken}");
+            return response($hubChallenge, 200)->header('Content-Type', 'text/plain');
+        }
+
+        // 2. Incoming Webhook Event from Meta
+        if ($request->isMethod('post') && in_array($platform, ['facebook', 'instagram'])) {
+            Log::info("Meta Webhook event payload for {$platform}: " . json_encode($request->all()));
+            return response()->json(['status' => 'EVENT_RECEIVED'], 200);
+        }
+
+        // 3. OAuth Error Handling
         if ($request->has('error')) {
             return redirect()->route('social.connections.index')
                 ->with('error', "OAuth Authorization failed: " . ($request->query('error_description') ?? $request->query('error')));
         }
 
+        // 4. OAuth Code Exchange
         $code = $request->query('code');
         if (empty($code)) {
             return redirect()->route('social.connections.index')
@@ -137,6 +155,25 @@ class SocialConnectionController extends Controller
         }
 
         return redirect()->route('social.connections.index')->with('success', "Connected {$platform} account successfully!");
+    }
+
+    /**
+     * Dedicated Meta Webhook Endpoint
+     */
+    public function handleMetaWebhook(Request $request)
+    {
+        $hubMode = $request->input('hub_mode') ?? $request->query('hub.mode') ?? $request->query('hub_mode');
+        $hubChallenge = $request->input('hub_challenge') ?? $request->query('hub.challenge') ?? $request->query('hub_challenge');
+
+        if ($hubMode === 'subscribe' && !empty($hubChallenge)) {
+            return response($hubChallenge, 200)->header('Content-Type', 'text/plain');
+        }
+
+        if ($request->isMethod('post')) {
+            return response()->json(['status' => 'EVENT_RECEIVED'], 200);
+        }
+
+        return response('Meta Webhook Endpoint Active', 200)->header('Content-Type', 'text/plain');
     }
 
     /**

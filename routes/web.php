@@ -48,6 +48,13 @@ Route::get('/blog/{slug}', [PublicBlogController::class, 'show'])->name('public.
 Route::get('/sitemap.xml', [PublicBlogController::class, 'sitemap'])->name('public.sitemap');
 Route::get('/llms.txt', [PublicBlogController::class, 'llmsTxt'])->name('public.llms_txt');
 
+// Public Social OAuth Callback & Webhook Verification (Accessible to Meta/LinkedIn/TikTok servers)
+Route::match(['get', 'post'], '/social/callback/{platform}', [SocialConnectionController::class, 'oauthCallback'])
+    ->name('social.oauth.callback');
+
+Route::match(['get', 'post'], '/webhooks/meta', [SocialConnectionController::class, 'handleMetaWebhook'])
+    ->name('webhooks.meta');
+
 // Shared Hosting Deployment & Database Migration Runner (bypasses session/database middleware)
 Route::get('/deploy', [DeploymentController::class, 'handle'])
     ->withoutMiddleware('web')
@@ -158,9 +165,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{account}/disconnect', [SocialConnectionController::class, 'disconnect'])->name('disconnect');
     });
 
-    // Official OAuth Redirect & Callback
+    // Official OAuth Redirect (Triggers flow from dashboard)
     Route::get('/social/oauth/{platform}/redirect', [SocialConnectionController::class, 'oauthRedirect'])->name('social.oauth.redirect');
-    Route::get('/social/callback/{platform}', [SocialConnectionController::class, 'oauthCallback'])->name('social.oauth.callback');
 
     // Settings → API Configuration & Developer Guides
     Route::prefix('social-scheduler/config')->name('social.config.')->group(function () {
