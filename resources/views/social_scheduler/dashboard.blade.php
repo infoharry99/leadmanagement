@@ -250,8 +250,8 @@
                         <!-- Actions -->
                         <td class="text-end pe-4">
                             <div class="d-inline-flex align-items-center gap-1">
-                                <a href="{{ route('social.posts.show', $post) }}" class="btn btn-sm btn-outline-secondary rounded-2" title="View Details">
-                                    <i class="bi bi-eye"></i>
+                                <a href="{{ route('social.posts.show', $post) }}" class="btn btn-sm btn-outline-secondary rounded-2 px-2" title="View Delivery Details">
+                                    <i class="bi bi-eye me-1"></i> Details
                                 </a>
 
                                 @if ($post->status === 'failed')

@@ -158,9 +158,32 @@
                                 </div>
 
                                 @if ($pa->platform_post_id)
-                                    <div class="small text-muted mt-1">
+                                    <div class="small text-muted mt-2">
                                         Post ID: <code class="text-dark">{{ $pa->platform_post_id }}</code>
                                     </div>
+
+                                    @if (str_starts_with($pa->platform_post_id, 'fb_post_') || str_starts_with($pa->platform_post_id, 'ig_post_'))
+                                        <div class="alert alert-warning py-2 px-3 small mt-2 mb-0 rounded-3">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> 
+                                            <strong>Sandbox / Demo Post:</strong> This post was simulated because the connected account was authorized with a placeholder/demo token. To publish real posts directly to your live Facebook Page or Instagram, please connect using official OAuth in <strong>Settings &rarr; Social Media Connections</strong>.
+                                        </div>
+                                    @else
+                                        <div class="mt-2">
+                                            @if ($platform === 'facebook')
+                                                <a href="https://facebook.com/{{ $pa->platform_post_id }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-2">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i> View Live on Facebook
+                                                </a>
+                                            @elseif ($platform === 'instagram')
+                                                <a href="https://instagram.com" target="_blank" class="btn btn-sm btn-outline-danger rounded-2">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i> Open Instagram Profile
+                                                </a>
+                                            @elseif ($platform === 'linkedin')
+                                                <a href="https://www.linkedin.com/feed/update/{{ $pa->platform_post_id }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-2">
+                                                    <i class="bi bi-box-arrow-up-right me-1"></i> View Live on LinkedIn
+                                                </a>
+                                            @endif
+                                        </div>
+                                    @endif
                                 @endif
 
                                 @if ($pa->status === 'failed' && $pa->error_message)

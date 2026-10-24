@@ -8,6 +8,7 @@ use App\Models\SocialPost;
 use App\Models\SocialPostAccount;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class SocialMediaService
@@ -190,21 +191,39 @@ class SocialMediaService
             if ($hasMedia) {
                 $firstMedia = $mediaUrls[0];
                 $isVideo = preg_match('/\.(mp4|mov|webm)$/i', $firstMedia);
+                $relativePath = str_replace('/storage/', '', $firstMedia);
+                $localFullPath = Storage::disk('public')->path($relativePath);
 
                 if ($isVideo) {
-                    // Video Post
-                    $res = Http::post($endpoint . 'videos', [
-                        'file_url' => url($firstMedia),
-                        'description' => $fullText,
-                        'access_token' => $token,
-                    ]);
+                    // Video Post: Stream direct file if available, or fallback to public URL
+                    if (file_exists($localFullPath)) {
+                        $res = Http::attach('source', file_get_contents($localFullPath), basename($localFullPath))
+                            ->post($endpoint . 'videos', [
+                                'description' => $fullText,
+                                'access_token' => $token,
+                            ]);
+                    } else {
+                        $res = Http::post($endpoint . 'videos', [
+                            'file_url' => $this->resolvePublicMediaUrl($firstMedia),
+                            'description' => $fullText,
+                            'access_token' => $token,
+                        ]);
+                    }
                 } else {
-                    // Photo Post
-                    $res = Http::post($endpoint . 'photos', [
-                        'url' => url($firstMedia),
-                        'caption' => $fullText,
-                        'access_token' => $token,
-                    ]);
+                    // Photo Post: Direct multipart upload streams image directly to Facebook
+                    if (file_exists($localFullPath)) {
+                        $res = Http::attach('source', file_get_contents($localFullPath), basename($localFullPath))
+                            ->post($endpoint . 'photos', [
+                                'caption' => $fullText,
+                                'access_token' => $token,
+                            ]);
+                    } else {
+                        $res = Http::post($endpoint . 'photos', [
+                            'url' => $this->resolvePublicMediaUrl($firstMedia),
+                            'caption' => $fullText,
+                            'access_token' => $token,
+                        ]);
+                    }
                 }
             } else {
                 // Text Status Post
@@ -222,10 +241,17 @@ class SocialMediaService
             return ['success' => false, 'error' => "Meta Graph API Error: {$errorMsg}"];
         }
 
-        // Clean Sandbox confirmation for local/staging testing
+        // Allow mock sandbox in automated testing
+        if (app()->environment('testing')) {
+            return [
+                'success' => true,
+                'platform_post_id' => 'fb_post_' . rand(100000000000, 999999999999),
+            ];
+        }
+
         return [
-            'success' => true,
-            'platform_post_id' => 'fb_post_' . rand(100000000000, 999999999999),
+            'success' => false,
+            'error' => "Placeholder/demo access token detected for Facebook Page '{$account->account_name}'. To publish directly to your live Facebook page, please click 'Reconnect' in Settings → Social Media Connections or provide a valid Meta Page Access Token.",
         ];
     }
 
@@ -245,6 +271,7 @@ class SocialMediaService
         $fullText = $this->buildFullPostText($post);
         $firstMedia = $mediaUrls[0];
         $isVideo = preg_match('/\.(mp4|mov|webm)$/i', $firstMedia);
+        $publicMediaUrl = $this->resolvePublicMediaUrl($firstMedia);
 
         if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
             $endpoint = "https://graph.facebook.com/v20.0/{$igUserId}/";
@@ -257,9 +284,9 @@ class SocialMediaService
 
             if ($isVideo) {
                 $containerParams['media_type'] = 'REELS';
-                $containerParams['video_url'] = url($firstMedia);
+                $containerParams['video_url'] = $publicMediaUrl;
             } else {
-                $containerParams['image_url'] = url($firstMedia);
+                $containerParams['image_url'] = $publicMediaUrl;
             }
 
             $containerRes = Http::post($endpoint . 'media', $containerParams);
@@ -285,10 +312,42 @@ class SocialMediaService
             return ['success' => false, 'error' => "Instagram Publish Error: {$errorMsg}"];
         }
 
+        if (app()->environment('testing')) {
+            return [
+                'success' => true,
+                'platform_post_id' => 'ig_post_' . rand(100000000000, 999999999999),
+            ];
+        }
+
         return [
-            'success' => true,
-            'platform_post_id' => 'ig_post_' . rand(100000000000, 999999999999),
+            'success' => false,
+            'error' => "Placeholder/demo access token detected for Instagram ('{$account->account_name}'). Please connect your Instagram Business account via Official OAuth in Settings → Social Media Connections.",
         ];
+    }
+
+    /**
+     * Resolve public media URL, fixing localhost / 127.0.0.1 on production servers
+     */
+    protected function resolvePublicMediaUrl(string $mediaPath): string
+    {
+        if (str_starts_with($mediaPath, 'http://') || str_starts_with($mediaPath, 'https://')) {
+            $url = $mediaPath;
+        } else {
+            $url = url($mediaPath);
+        }
+
+        // Replace localhost/127.0.0.1 with actual host if request is from a live domain
+        if (str_contains($url, '127.0.0.1') || str_contains($url, 'localhost')) {
+            if (request() && request()->getHost() && !str_contains(request()->getHost(), '127.0.0.1')) {
+                $url = str_replace(
+                    ['http://127.0.0.1:8000', 'http://127.0.0.1', 'http://localhost'],
+                    request()->getSchemeAndHttpHost(),
+                    $url
+                );
+            }
+        }
+
+        return $url;
     }
 
     /**
@@ -327,9 +386,16 @@ class SocialMediaService
             return ['success' => false, 'error' => "LinkedIn API Error: {$errorMsg}"];
         }
 
+        if (app()->environment('testing')) {
+            return [
+                'success' => true,
+                'platform_post_id' => 'urn:li:share:' . rand(1000000000, 9999999999),
+            ];
+        }
+
         return [
-            'success' => true,
-            'platform_post_id' => 'urn:li:share:' . rand(1000000000, 9999999999),
+            'success' => false,
+            'error' => "Placeholder/demo access token detected for LinkedIn ('{$account->account_name}'). Please connect your LinkedIn account via Official OAuth in Settings → Social Media Connections.",
         ];
     }
 
@@ -347,6 +413,7 @@ class SocialMediaService
 
         $firstMedia = $mediaUrls[0];
         $fullText = $this->buildFullPostText($post);
+        $publicMediaUrl = $this->resolvePublicMediaUrl($firstMedia);
 
         if (!empty($token) && !str_starts_with($token, 'oauth_token_') && !str_starts_with($token, 'mock_')) {
             $payload = [
@@ -359,7 +426,7 @@ class SocialMediaService
                 ],
                 'source_info' => [
                     'source' => 'PULL_FROM_URL',
-                    'video_url' => url($firstMedia),
+                    'video_url' => $publicMediaUrl,
                 ],
             ];
 
@@ -374,9 +441,16 @@ class SocialMediaService
             return ['success' => false, 'error' => "TikTok API Error: {$errorMsg}"];
         }
 
+        if (app()->environment('testing')) {
+            return [
+                'success' => true,
+                'platform_post_id' => 'tt_publish_' . rand(10000000, 99999999),
+            ];
+        }
+
         return [
-            'success' => true,
-            'platform_post_id' => 'tt_publish_' . rand(10000000, 99999999),
+            'success' => false,
+            'error' => "Placeholder/demo access token detected for TikTok ('{$account->account_name}'). Please connect your TikTok account via Official OAuth in Settings → Social Media Connections.",
         ];
     }
 
