@@ -285,4 +285,19 @@ class SocialPostSchedulerTest extends TestCase
         $response->assertSee(route('social.oauth.callback', ['platform' => 'linkedin']));
         $response->assertSee(route('social.oauth.callback', ['platform' => 'tiktok']));
     }
+
+    public function test_user_can_save_api_configuration_successfully(): void
+    {
+        $response = $this->actingAs($this->user)->post(route('social.config.update'), [
+            'facebook_app_id' => '1124088806732272',
+            'facebook_app_secret' => 'sec_meta_12345',
+            'linkedin_client_id' => 'li_client_999',
+            'linkedin_client_secret' => 'li_sec_999',
+            'tiktok_client_key' => 'tt_key_888',
+            'tiktok_client_secret' => 'tt_sec_888',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+    }
 }

@@ -101,11 +101,16 @@ class SocialConfigController extends Controller
 
         $envContent = File::get($envFile);
 
+        $fbAppId = $validated['facebook_app_id'] ?? '';
+        $fbAppSecret = $validated['facebook_app_secret'] ?? '';
+        $igClientId = $validated['instagram_client_id'] ?? $fbAppId;
+        $igClientSecret = $validated['instagram_client_secret'] ?? $fbAppSecret;
+
         $keysToUpdate = [
-            'FACEBOOK_APP_ID' => $validated['facebook_app_id'] ?? '',
-            'FACEBOOK_APP_SECRET' => $validated['facebook_app_secret'] ?? '',
-            'INSTAGRAM_CLIENT_ID' => $validated['instagram_client_id'] ?: ($validated['facebook_app_id'] ?? ''),
-            'INSTAGRAM_CLIENT_SECRET' => $validated['instagram_client_secret'] ?: ($validated['facebook_app_secret'] ?? ''),
+            'FACEBOOK_APP_ID' => $fbAppId,
+            'FACEBOOK_APP_SECRET' => $fbAppSecret,
+            'INSTAGRAM_CLIENT_ID' => !empty($igClientId) ? $igClientId : $fbAppId,
+            'INSTAGRAM_CLIENT_SECRET' => !empty($igClientSecret) ? $igClientSecret : $fbAppSecret,
             'LINKEDIN_CLIENT_ID' => $validated['linkedin_client_id'] ?? '',
             'LINKEDIN_CLIENT_SECRET' => $validated['linkedin_client_secret'] ?? '',
             'TIKTOK_CLIENT_KEY' => $validated['tiktok_client_key'] ?? '',

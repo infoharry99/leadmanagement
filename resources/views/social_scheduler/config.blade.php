@@ -48,12 +48,25 @@
                         @endif
                     </div>
                     <div class="mb-2">
-                        <label class="form-label small fw-semibold text-muted mb-1">Meta App ID</label>
-                        <input type="text" name="facebook_app_id" class="form-control form-control-sm rounded-2 font-monospace" placeholder="e.g. 104928472918475" value="{{ old('facebook_app_id', $credentials['facebook_app_id']) }}">
+                        <label class="form-label small fw-semibold text-muted mb-1">Meta App ID (Facebook App ID)</label>
+                        <input type="text" name="facebook_app_id" class="form-control form-control-sm rounded-2 font-monospace" placeholder="e.g. 1124088806732272" value="{{ old('facebook_app_id', $credentials['facebook_app_id']) }}">
                     </div>
-                    <div>
+                    <div class="mb-3">
                         <label class="form-label small fw-semibold text-muted mb-1">Meta App Secret</label>
                         <input type="password" name="facebook_app_secret" class="form-control form-control-sm rounded-2 font-monospace" placeholder="••••••••••••••••••••" value="{{ old('facebook_app_secret', $credentials['facebook_app_secret']) }}">
+                    </div>
+
+                    <!-- Dedicated Instagram App ID (Optional) -->
+                    <div class="border-top pt-2 mt-2">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <label class="form-label small fw-semibold text-dark mb-0 d-flex align-items-center gap-1">
+                                <i class="bi bi-instagram text-danger"></i> Dedicated Instagram App ID <span class="text-muted fw-normal">(Optional)</span>
+                            </label>
+                        </div>
+                        <input type="text" name="instagram_client_id" class="form-control form-control-sm rounded-2 font-monospace mb-2" placeholder="e.g. 2799091900487330" value="{{ old('instagram_client_id', $credentials['instagram_client_id']) }}">
+                        <label class="form-label small fw-semibold text-dark mb-1">Dedicated Instagram App Secret <span class="text-muted fw-normal">(Optional)</span></label>
+                        <input type="password" name="instagram_client_secret" class="form-control form-control-sm rounded-2 font-monospace" placeholder="••••••••••••••••••••" value="{{ old('instagram_client_secret', $credentials['instagram_client_secret']) }}">
+                        <small class="text-muted d-block mt-1">If your Instagram use case in Meta has its own App ID/Secret, enter them above. Otherwise, leave blank to use the Meta App ID.</small>
                     </div>
                 </div>
 
