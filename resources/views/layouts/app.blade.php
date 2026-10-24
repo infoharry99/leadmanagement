@@ -327,8 +327,8 @@
             <a href="{{ route('ai.index') }}" class="nx-nav-link {{ request()->routeIs('ai.*') ? 'active' : '' }}">
                 <i class="bi bi-magic"></i> AI Content Studio
             </a>
-            <a href="{{ route('social.index') }}" class="nx-nav-link {{ request()->routeIs('social.*') ? 'active' : '' }}">
-                <i class="bi bi-share-fill"></i> Social Publishing
+            <a href="{{ route('social.posts.dashboard') }}" class="nx-nav-link {{ request()->routeIs('social.*') ? 'active' : '' }}">
+                <i class="bi bi-calendar2-range-fill text-primary"></i> Post Scheduler
             </a>
 
             <div class="nx-nav-header">SEO, AEO & CMS</div>

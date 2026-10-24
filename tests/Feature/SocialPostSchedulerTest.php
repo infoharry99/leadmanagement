@@ -64,12 +64,20 @@ class SocialPostSchedulerTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Create New Social Post');
+        $response->assertSee('Upload Media');
+        $response->assertSee('name="media"', false);
         $response->assertSee('Facebook Pages');
         $response->assertSee('Instagram');
         $response->assertSee('LinkedIn');
         $response->assertSee('TikTok');
         $response->assertSee('Requires an image or video file');
         $response->assertSee('Requires a video file (.mp4, .mov, 3s-10m)');
+
+        // Also verify legacy /social/create path renders the new form with image upload
+        $responseLegacy = $this->actingAs($this->user)->get('/social/create');
+        $responseLegacy->assertStatus(200);
+        $responseLegacy->assertSee('Upload Media');
+        $responseLegacy->assertSee('name="media"', false);
     }
 
     public function test_user_can_create_and_publish_immediate_post(): void

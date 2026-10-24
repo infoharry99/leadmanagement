@@ -13,50 +13,19 @@ class SocialPublishingController extends Controller
     {
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $accounts = SocialAccount::all();
-        $posts = SocialPost::with(['postAccounts.account', 'createdBy'])
-            ->latest()
-            ->paginate(15);
-
-        return view('social.index', compact('accounts', 'posts'));
+        return app(SocialPostController::class)->dashboard($request);
     }
 
     public function create()
     {
-        $accounts = SocialAccount::where('is_active', true)->get();
-        return view('social.create', compact('accounts'));
+        return app(SocialPostController::class)->create();
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'title' => 'nullable|string|max:255',
-            'content' => 'required|string',
-            'target_platforms' => 'required|array|min:1',
-            'target_platforms.*' => 'in:linkedin,facebook,instagram,tiktok',
-            'scheduled_at' => 'nullable|date',
-            'publish_now' => 'nullable|boolean',
-        ]);
-
-        $publishNow = $request->boolean('publish_now');
-
-        $post = SocialPost::create([
-            'title' => $validated['title'] ?? 'Social Post',
-            'content' => $validated['content'],
-            'target_platforms' => $validated['target_platforms'],
-            'status' => $publishNow ? 'publishing' : (!empty($validated['scheduled_at']) ? 'scheduled' : 'draft'),
-            'scheduled_at' => $validated['scheduled_at'] ?? null,
-            'created_by_id' => auth()->id(),
-        ]);
-
-        if ($publishNow) {
-            $this->socialService->publishPost($post);
-            return redirect()->route('social.index')->with('success', 'Post published to designated social accounts.');
-        }
-
-        return redirect()->route('social.index')->with('success', $post->status === 'scheduled' ? 'Post scheduled successfully.' : 'Post saved as draft.');
+        return app(SocialPostController::class)->store($request);
     }
 
     public function retry(SocialPost $post)

@@ -168,13 +168,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [SocialConfigController::class, 'update'])->name('update');
     });
 
-    // Legacy Social Media Publishing & Engagement Compatibility
+    // Social Media Publishing & Engagement (Mapped to Simple Post Scheduler)
     Route::prefix('social')->name('social.')->group(function () {
-        Route::get('/', [SocialPublishingController::class, 'index'])->name('index');
-        Route::get('/create', [SocialPublishingController::class, 'create'])->name('create');
-        Route::post('/', [SocialPublishingController::class, 'store'])->name('store');
-        Route::post('/posts/{post}/retry', [SocialPublishingController::class, 'retry'])->name('retry');
-        Route::post('/accounts/connect', [SocialPublishingController::class, 'connectAccount'])->name('connect');
+        Route::get('/', [SocialPostController::class, 'dashboard'])->name('index');
+        Route::get('/create', [SocialPostController::class, 'create'])->name('create');
+        Route::post('/', [SocialPostController::class, 'store'])->name('store');
+        Route::post('/posts/{post}/retry', [SocialPostController::class, 'retry'])->name('retry');
+        Route::post('/accounts/connect', [SocialConnectionController::class, 'connectManual'])->name('connect');
     });
 
     // Blog CMS & SEO/AEO/GEO
