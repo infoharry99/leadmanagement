@@ -11,6 +11,7 @@ use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\FollowupSequenceController;
 use App\Http\Controllers\LeadController;
 use App\Http\Controllers\LeadImportExportController;
+use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManagerHandoverController;
 use App\Http\Controllers\PublicBlogController;
 use App\Http\Controllers\ReportsController;
@@ -41,6 +42,13 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Public Unsubscribe & Preference Center
 Route::get('/unsubscribe/{token}', [UnsubscribeController::class, 'show'])->name('unsubscribe.show');
 Route::post('/unsubscribe/{token}', [UnsubscribeController::class, 'process'])->name('unsubscribe.process');
+
+// Public Legal & Meta Compliance Pages
+Route::get('/privacy-policy', [LegalController::class, 'privacyPolicy'])->name('legal.privacy');
+Route::get('/terms-of-service', [LegalController::class, 'termsOfService'])->name('legal.terms');
+Route::get('/data-deletion', [LegalController::class, 'dataDeletionInstructions'])->name('legal.data_deletion');
+Route::post('/data-deletion/callback', [LegalController::class, 'dataDeletionCallback'])->name('legal.data_deletion_callback');
+Route::get('/data-deletion/status', [LegalController::class, 'dataDeletionStatus'])->name('legal.data_deletion_status');
 
 // Public Blog & SEO/AEO/GEO Endpoints
 Route::get('/blog', [PublicBlogController::class, 'index'])->name('public.blog.index');

@@ -300,4 +300,24 @@ class SocialPostSchedulerTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success');
     }
+
+    public function test_meta_compliance_legal_pages_render_successfully(): void
+    {
+        $privacy = $this->get(route('legal.privacy'));
+        $privacy->assertStatus(200);
+        $privacy->assertSee('Privacy Policy');
+
+        $terms = $this->get(route('legal.terms'));
+        $terms->assertStatus(200);
+        $terms->assertSee('Terms of Service');
+
+        $deletion = $this->get(route('legal.data_deletion'));
+        $deletion->assertStatus(200);
+        $deletion->assertSee('User Data Deletion Instructions');
+        $deletion->assertSee('Meta Platform Terms');
+
+        $deletionCallback = $this->postJson(route('legal.data_deletion_callback'), []);
+        $deletionCallback->assertStatus(200);
+        $deletionCallback->assertJsonStructure(['url', 'confirmation_code']);
+    }
 }

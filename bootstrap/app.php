@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'social/callback/*',
             'webhooks/*',
+            'data-deletion/callback',
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,

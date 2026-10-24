@@ -143,6 +143,48 @@
                 @endforeach
             </div>
         </div>
+
+        <!-- Meta App Basic Settings & Legal URLs -->
+        <div class="card border-0 shadow-sm rounded-4 p-4 mt-4">
+            <h5 class="fw-bold text-dark mb-2 d-flex align-items-center gap-2">
+                <i class="bi bi-file-earmark-check text-success"></i> Meta App Settings &amp; Legal URLs
+            </h5>
+            <p class="text-muted small mb-3">
+                Paste these URLs into Meta for Developers under <strong>App settings &rarr; Basic</strong> to resolve submission requirements:
+            </p>
+
+            <div class="d-flex flex-column gap-3">
+                <div>
+                    <label class="form-label small fw-semibold text-dark mb-1">Privacy Policy URL</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace bg-light" value="{{ route('legal.privacy') }}" id="legal_privacy" readonly>
+                        <button type="button" class="btn btn-outline-secondary copy-btn" data-target="legal_privacy">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label small fw-semibold text-dark mb-1">Terms of Service URL</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace bg-light" value="{{ route('legal.terms') }}" id="legal_terms" readonly>
+                        <button type="button" class="btn btn-outline-secondary copy-btn" data-target="legal_terms">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="form-label small fw-semibold text-dark mb-1">User Data Deletion Instructions URL</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace bg-light" value="{{ route('legal.data_deletion') }}" id="legal_deletion" readonly>
+                        <button type="button" class="btn btn-outline-secondary copy-btn" data-target="legal_deletion">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Right: Step-by-Step Developer Setup Guides -->
