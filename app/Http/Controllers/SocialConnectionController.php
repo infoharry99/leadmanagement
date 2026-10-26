@@ -60,11 +60,42 @@ class SocialConnectionController extends Controller
     }
 
     /**
+     * Get clean HTTPS OAuth Redirect URI matching live domain
+     */
+    protected function getNormalizedRedirectUri(string $platform): string
+    {
+        $redirectUri = route('social.oauth.callback', ['platform' => $platform]);
+
+        // Ensure HTTPS on production or live domain
+        if (
+            request()->secure() ||
+            request()->header('X-Forwarded-Proto') === 'https' ||
+            (request()->getHost() && str_contains(request()->getHost(), 'nexteck.uk')) ||
+            !app()->environment('local')
+        ) {
+            $redirectUri = str_replace('http://', 'https://', $redirectUri);
+        }
+
+        // Dynamically fix host if APP_URL was left as localhost/127.0.0.1 on a live server
+        if (str_contains($redirectUri, '127.0.0.1') || str_contains($redirectUri, 'localhost')) {
+            if (request()->getHost() && !str_contains(request()->getHost(), '127.0.0.1')) {
+                $redirectUri = str_replace(
+                    ['http://127.0.0.1:8000', 'http://127.0.0.1', 'http://localhost'],
+                    request()->getSchemeAndHttpHost(),
+                    $redirectUri
+                );
+            }
+        }
+
+        return $redirectUri;
+    }
+
+    /**
      * Redirect to Official OAuth Authorization URL
      */
     public function oauthRedirect(string $platform)
     {
-        $redirectUri = route('social.oauth.callback', ['platform' => $platform]);
+        $redirectUri = $this->getNormalizedRedirectUri($platform);
 
         switch ($platform) {
             case 'facebook':
@@ -134,7 +165,7 @@ class SocialConnectionController extends Controller
                 ->with('error', 'No authorization code received from platform.');
         }
 
-        $redirectUri = route('social.oauth.callback', ['platform' => $platform]);
+        $redirectUri = $this->getNormalizedRedirectUri($platform);
 
         try {
             switch ($platform) {
