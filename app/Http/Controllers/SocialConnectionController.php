@@ -99,12 +99,21 @@ class SocialConnectionController extends Controller
 
         switch ($platform) {
             case 'facebook':
-            case 'instagram':
                 $appId = env('FACEBOOK_APP_ID') ?: env('META_APP_ID');
                 if (empty($appId)) {
                     return back()->with('error', 'Meta App ID is not configured. Please enter your Meta credentials in Settings → API Configuration.');
                 }
-                $scopes = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish';
+                $scopes = 'pages_show_list,pages_read_engagement,pages_manage_posts';
+                $url = "https://www.facebook.com/v20.0/dialog/oauth?client_id={$appId}&redirect_uri=" . urlencode($redirectUri) . "&scope={$scopes}&response_type=code";
+                return redirect()->away($url);
+
+            case 'instagram':
+                $appId = env('INSTAGRAM_CLIENT_ID') ?: env('FACEBOOK_APP_ID') ?: env('META_APP_ID');
+                if (empty($appId)) {
+                    return back()->with('error', 'Meta / Instagram App ID is not configured. Please enter your Meta credentials in Settings → API Configuration.');
+                }
+                // Only request Instagram scopes (do NOT include pages_manage_posts)
+                $scopes = 'instagram_basic,instagram_content_publish,pages_show_list';
                 $url = "https://www.facebook.com/v20.0/dialog/oauth?client_id={$appId}&redirect_uri=" . urlencode($redirectUri) . "&scope={$scopes}&response_type=code";
                 return redirect()->away($url);
 
